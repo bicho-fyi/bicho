@@ -1,0 +1,2826 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Bicho core API",
+    "version": "1.0.0",
+    "description": "Self-hosted OTLP/HTTP error-log ingestion, append-only evidence, authenticated investigation reads, explicit issue state and MCP issue-status updates. This file is repository documentation only: the Worker serves no OpenAPI/Swagger/docs route. CORS preflights and automatic HEAD responses on read routes are transport behavior, not listed operations.",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{host}",
+      "variables": {
+        "host": {
+          "default": "your-bicho-worker.example",
+          "description": "Replace with your deployment hostname; never put credentials here."
+        }
+      }
+    },
+    {
+      "url": "http://localhost:8787",
+      "description": "Operator-started local development."
+    }
+  ],
+  "security": [
+    {
+      "AdminBearer": []
+    }
+  ],
+  "paths": {
+    "/v1/logs": {
+      "post": {
+        "operationId": "ingestOtlpLogs",
+        "summary": "Accept OpenTelemetry error logs",
+        "description": "Primary OTLP/HTTP input: JSON protobuf mapping or binary protobuf ExportLogsServiceRequest. Resolve the project by its unique ingest key, not resource attributes. Accept exception records at any severity and plain ERROR/FATAL logs; unsupported records are counted in partialSuccess. Support gzip and uncompressed bodies with decoded-byte limits. Optional log.record.uid enables project-scoped retry deduplication; correlation IDs are not occurrence IDs. No traces, metrics or gRPC receiver. Request validation follows the OTLP specification; the OpenAPI schema is a structural outline, not the full protobuf schema.",
+        "security": [
+          {
+            "OTLPIngest": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Bicho-Secret",
+            "in": "header",
+            "required": false,
+            "description": "Required only for projects provisioned with --secret; ingest-only, never an admin credential.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Encoding",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "identity",
+                "gzip",
+                "deflate"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resourceLogs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "application/x-protobuf": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTLP ExportLogsServiceResponse. An empty object indicates full success; partialSuccess counts rejected records. Accepted records are durable. Clients must not retry populated partial-success responses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpExportResponse"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid OTLP body or record count. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing/invalid ingest key or required secret. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only POST and OPTIONS are supported. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Wire, decompressed input or record size exceeds a limit. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported content type or compression. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded before any records were accepted; honor Retry-After. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary storage failure before acceptance; ambiguous delivery may duplicate records without a stable UID. Body is google.rpc.Status in the request encoding (JSON for an unsupported content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtlpStatus"
+                }
+              },
+              "application/x-protobuf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "operationId": "redirectRoot",
+        "summary": "Redirect to the Bicho website",
+        "security": [],
+        "responses": {
+          "302": {
+            "description": "Redirect without forwarding query parameters.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "const": "https://bicho.fyi"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "post": {
+        "operationId": "createProject",
+        "summary": "Register a new project",
+        "description": "Creates a project with a unique server-generated numeric-string ID and random ingest credentials. Never replaces an existing project. Credentials are returned only here; store them securely. Each request creates a new project, so do not retry blindly after a lost response. Body is limited to 4096 wire/decoded bytes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S", "description": "Trimmed before storage; whitespace-only names are rejected." },
+                  "hourly_limit": { "type": "integer", "minimum": 1, "maximum": 1000000, "default": 1000 },
+                  "secret": { "type": "boolean", "default": false, "description": "Require an additional backend-only ingest secret." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project registered. Includes ingest credentials; never an admin token or secret hash.",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestId" },
+              "Cache-Control": { "$ref": "#/components/headers/CacheControl" }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["project", "otlp"],
+                  "properties": {
+                    "project": { "$ref": "#/components/schemas/Project" },
+                    "otlp": {
+                      "type": "object",
+                      "required": ["endpoint", "headers"],
+                      "properties": {
+                        "endpoint": { "type": "string", "format": "uri" },
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["X-Bicho-Key"],
+                          "properties": {
+                            "X-Bicho-Key": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+                            "X-Bicho-Secret": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" },
+          "401": { "$ref": "#/components/responses/Error401" },
+          "413": { "$ref": "#/components/responses/Error413" },
+          "415": { "$ref": "#/components/responses/Error415" },
+          "500": { "$ref": "#/components/responses/Error500" },
+          "503": { "$ref": "#/components/responses/Error503" }
+        }
+      },
+      "get": {
+        "operationId": "listProjects",
+        "summary": "List project IDs, names and quotas",
+        "description": "Does not return public ingest keys or ingest secret hashes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/issues": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "operationId": "searchIssues",
+        "summary": "Search grouped issues",
+        "description": "Orders by snapshot_last_seen DESC, id ASC. event_count is all-time/live; matched_count is the filtered snapshot count. Up to 16 tag.KEY=value query predicates, each key 1..128 characters and value <=512 characters. All filters and tags must match the same stored event. Duplicate non-tag investigation parameters are rejected.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/From"
+          },
+          {
+            "$ref": "#/components/parameters/To"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Release"
+          },
+          {
+            "$ref": "#/components/parameters/Level"
+          },
+          {
+            "$ref": "#/components/parameters/IssueFilter"
+          },
+          {
+            "$ref": "#/components/parameters/IssueStatus"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/issues/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "$ref": "#/components/parameters/IssueId"
+        }
+      ],
+      "get": {
+        "operationId": "getIssue",
+        "summary": "Read issue and paginated events",
+        "description": "Includes resolved/ignored/muted issues. Events order by received_at DESC, id ASC. issue_id query, if supplied, must equal the path. Up to 16 tag.KEY=value query predicates, each key 1..128 characters and value <=512 characters. All filters and tags must match the same stored event. Duplicate non-tag investigation parameters are rejected.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/From"
+          },
+          {
+            "$ref": "#/components/parameters/To"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Release"
+          },
+          {
+            "$ref": "#/components/parameters/Level"
+          },
+          {
+            "$ref": "#/components/parameters/IssueFilter"
+          },
+          {
+            "$ref": "#/components/parameters/Status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "setIssueStatus",
+        "summary": "Resolve, ignore, mute or reopen without deleting evidence",
+        "description": "Only the status field is accepted. Actual transitions append shared-admin history; repeating a status adds no history.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ContentEncoding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueState"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Maximum 1024 bytes, wire and decoded.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueStateInput"
+              },
+              "example": {
+                "status": "resolved"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{project_id}/issues/{id}/history": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "$ref": "#/components/parameters/IssueId"
+        }
+      ],
+      "get": {
+        "operationId": "getIssueHistory",
+        "summary": "Read issue-state history",
+        "description": "Orders by monotonically increasing history id DESC. Only time/pagination filters are allowed. actor=admin does not identify an individual.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/From"
+          },
+          {
+            "$ref": "#/components/parameters/To"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/events": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "operationId": "searchEvents",
+        "summary": "Search captured event metadata",
+        "description": "Orders by received_at DESC, id ASC; time bounds apply to timestamp, not receipt. Up to 16 tag.KEY=value query predicates, each key 1..128 characters and value <=512 characters. All filters and tags must match the same stored event. Duplicate non-tag investigation parameters are rejected.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/From"
+          },
+          {
+            "$ref": "#/components/parameters/To"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Release"
+          },
+          {
+            "$ref": "#/components/parameters/Level"
+          },
+          {
+            "$ref": "#/components/parameters/IssueFilter"
+          },
+          {
+            "$ref": "#/components/parameters/Status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/events/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "$ref": "#/components/parameters/EventId"
+        }
+      ],
+      "get": {
+        "operationId": "getEvent",
+        "summary": "Read captured JSON or bounded evidence projection",
+        "description": "No projection parameters returns complete stored captured JSON. Any projection parameter selects the bounded form. Check truncated/available_fields_incomplete and nested enrichment flags; missing fields are not proof of absence.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Fields"
+          },
+          {
+            "$ref": "#/components/parameters/MaxBytes"
+          },
+          {
+            "$ref": "#/components/parameters/IncludeEnrichment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/releases": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "operationId": "listReleases",
+        "summary": "List releases observed in events",
+        "description": "Derived from non-null/non-empty release strings; no release management API. Orders by last_seen DESC, release ASC.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleasePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/stats": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "operationId": "getStats",
+        "summary": "Read deterministic occurrence-time statistics",
+        "description": "Default last 24 hours, maximum 90 days and 2160 UTC buckets. Pagination is forbidden. total_count is project/range before other filters; matching_count, unique_issues, buckets and breakdowns apply all filters. Empty buckets omitted; top-20 breakdowns include other_count; at most five representative events. Up to 16 tag.KEY=value query predicates, each key 1..128 characters and value <=512 characters. All filters and tags must match the same stored event. Duplicate non-tag investigation parameters are rejected.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/From"
+          },
+          {
+            "$ref": "#/components/parameters/To"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/Environment"
+          },
+          {
+            "$ref": "#/components/parameters/Release"
+          },
+          {
+            "$ref": "#/components/parameters/Level"
+          },
+          {
+            "$ref": "#/components/parameters/IssueFilter"
+          },
+          {
+            "$ref": "#/components/parameters/Status"
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "day"
+              ],
+              "default": "hour"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Statistics"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/processing": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "get": {
+        "operationId": "getProcessingHealth",
+        "summary": "Read project counts and global processor health",
+        "description": "Project counts are distinct from shared global processor state. pending can mean waiting for a map or resumable work; failed includes permanent evidence errors and retry-exhausted storage failures. Raw error text/storage keys are omitted.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingHealth"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/sourcemaps/{debug_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        },
+        {
+          "$ref": "#/components/parameters/DebugId"
+        }
+      ],
+      "get": {
+        "operationId": "getSourceMapMetadata",
+        "summary": "Read map metadata, not source contents",
+        "description": "",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceMapMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "put": {
+        "operationId": "uploadSourceMap",
+        "summary": "Register an immutable flat Source Map v3",
+        "description": "Identical retries return 200; first registration returns 201; conflicting normalized content returns 409. Upload invalidates all pending continuation in its project, including unrelated builds; prefer uploading maps before their events. Maximum 2 MiB wire/decoded bytes. A failed registration can retain an unindexed R2 object.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ContentEncoding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceMapMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "201": {
+            "description": "New registration.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceMapMetadata"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceMap"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "summary": "Stateless MCP Streamable HTTP",
+        "description": "Use an MCP client, not REST-style calls to individual tools. Nine read-only tools invoke authenticated read handlers; update_issue_status sets unresolved, resolved, ignored, or muted through the authenticated issue PATCH route. No other mutations, OAuth, sessions or GET/SSE subscription. Zod input schemas live in src/mcp.ts; authenticated tools/list advertises JSON Schema. Bodies <=64 KiB. SDK handles protocol negotiation/errors; notifications can return empty 202.",
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Send application/json, text/event-stream."
+          },
+          {
+            "name": "MCP-Protocol-Version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Version negotiated by the official MCP client."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional. Must match the Worker origin or permitted CORS_ORIGINS; null is rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorMcp400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "413": {
+            "$ref": "#/components/responses/ErrorMcp413"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorMcp500"
+          },
+          "202": {
+            "description": "Accepted notification; no response body."
+          },
+          "406": {
+            "$ref": "#/components/responses/ErrorMcp406"
+          },
+          "415": {
+            "$ref": "#/components/responses/ErrorMcp415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonRpcRequest"
+              },
+              "example": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OTLPIngest": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Bicho-Key",
+        "description": "Existing project public ingest key. Browser keys are public; backend projects can additionally require X-Bicho-Secret. Never authorizes read/admin/MCP operations."
+      },
+      "AdminBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Cloudflare secret BICHO_ADMIN_TOKEN. Missing server configuration fails closed with 503. The shared credential identifies no individual actor."
+      }
+    },
+    "parameters": {
+      "ProjectId": {
+        "name": "project_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9]\\d{0,18}$"
+        },
+        "description": "Numeric text project ID, not API version."
+      },
+      "IssueId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "description": "Lowercase SHA-256 issue fingerprint."
+      },
+      "EventId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "description": "Normalized lowercase event ID."
+      },
+      "DebugId": {
+        "name": "debug_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+        },
+        "description": "Project-scoped immutable build debug ID."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "default": 0
+        },
+        "description": "Legacy pagination. A nonzero offset cannot accompany a cursor."
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "description": "Opaque next_cursor from this project/endpoint with unchanged filters. Event membership/order are snapshot-scoped; issue states/counts remain live."
+      },
+      "From": {
+        "name": "from",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$"
+        },
+        "description": "Inclusive occurrence-time lower bound; history uses changed_at. UTC only, Z or +00:00; URL-encode the plus sign."
+      },
+      "To": {
+        "name": "to",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$"
+        },
+        "description": "Exclusive occurrence-time upper bound. Must be greater than from."
+      },
+      "Query": {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "description": "SQLite substring search with ASCII case folding: issue title on issue lists, captured message on event/statistics reads."
+      },
+      "Environment": {
+        "name": "environment",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "Release": {
+        "name": "release",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "Level": {
+        "name": "level",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "description": "Exact level match; SDK levels are fatal/error/warning/info/debug/log."
+      },
+      "IssueFilter": {
+        "name": "issue_id",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "Status": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "unresolved",
+            "resolved",
+            "ignored",
+            "muted",
+            "all"
+          ]
+        },
+        "description": "Optional current issue-status filter; no default on event/statistics reads."
+      },
+      "IssueStatus": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "unresolved",
+            "resolved",
+            "ignored",
+            "muted",
+            "all"
+          ],
+          "default": "unresolved"
+        }
+      },
+      "Fields": {
+        "name": "fields",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated 1..32 top-level keys matching ^[a-zA-Z][a-zA-Z0-9_]{0,63}$; constructor/prototype forbidden. Omitted projection fields use up to 32 captured keys."
+      },
+      "MaxBytes": {
+        "name": "max_bytes",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 2048,
+          "maximum": 65536,
+          "default": 32768
+        },
+        "description": "UTF-8 output budget for event projections, not a character count."
+      },
+      "IncludeEnrichment": {
+        "name": "include_enrichment",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "0",
+            "1"
+          ]
+        },
+        "description": "Only 1 includes derived data; status/error are present in every projection. Plain event reads do not include enrichment."
+      },
+      "ContentEncoding": {
+        "name": "Content-Encoding",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "gzip",
+            "deflate"
+          ]
+        },
+        "description": "Both wire and decoded bodies are independently bounded."
+      }
+    },
+    "schemas": {
+      "OtlpExportResponse": {
+        "type": "object",
+        "properties": {
+          "partialSuccess": {
+            "type": "object",
+            "properties": {
+              "rejectedLogRecords": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              "errorMessage": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "OtlpStatus": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9]\\d{0,18}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hourly_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "hourly_limit"
+        ]
+      },
+      "ProjectPage": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "projects",
+          "next_offset"
+        ]
+      },
+      "Issue": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[1-9]\\d{0,18}$"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unresolved",
+              "resolved",
+              "ignored",
+              "muted"
+            ]
+          },
+          "event_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "project_id",
+          "id",
+          "title",
+          "type",
+          "status",
+          "event_count",
+          "first_seen",
+          "last_seen"
+        ]
+      },
+      "IssueSearchItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Issue"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "matched_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "snapshot_last_seen": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "matched_count",
+              "snapshot_last_seen"
+            ]
+          }
+        ]
+      },
+      "IssuePage": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueSearchItem"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether another page exists. Follow next_cursor; next_offset is null on cursor requests even when more results exist."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "issues",
+          "next_offset",
+          "has_more",
+          "next_cursor",
+          "provenance"
+        ]
+      },
+      "IssueState": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "$ref": "#/components/schemas/Issue"
+          }
+        },
+        "required": [
+          "issue"
+        ]
+      },
+      "IssueStateInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unresolved",
+              "resolved",
+              "ignored",
+              "muted"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "EventMetadata": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "issue_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "fatal",
+              "error",
+              "warning",
+              "info",
+              "debug",
+              "log"
+            ]
+          },
+          "environment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "release": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "enrichment_status": {
+            "type": "string",
+            "enum": [
+              "not_applicable",
+              "pending",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "enrichment_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "issue_id",
+          "timestamp",
+          "received_at",
+          "level",
+          "environment",
+          "release",
+          "message",
+          "type",
+          "enrichment_status",
+          "enrichment_checked_at"
+        ]
+      },
+      "EventPage": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventMetadata"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether another page exists. Follow next_cursor; next_offset is null on cursor requests even when more results exist."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "events",
+          "next_offset",
+          "has_more",
+          "next_cursor",
+          "provenance"
+        ]
+      },
+      "IssueDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EventPage"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "issue": {
+                "$ref": "#/components/schemas/Issue"
+              }
+            },
+            "required": [
+              "issue"
+            ]
+          }
+        ]
+      },
+      "EventPayload": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "event_id"
+        ],
+        "additionalProperties": true,
+        "description": "Credential-filtered captured SDK JSON. Unknown fields are preserved. event_id is normalized; other payload shapes are not reconstructed from D1 metadata."
+      },
+      "Enrichment": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_applicable",
+              "pending",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Derived source-map evidence. Inspect incomplete, truncated, truncation_reason, processed_frames and per-frame reason/context flags. Projection budgets can shorten nested evidence."
+          }
+        },
+        "required": [
+          "status",
+          "error"
+        ]
+      },
+      "EventProjection": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "enrichment": {
+            "$ref": "#/components/schemas/Enrichment"
+          },
+          "error": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "available_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "available_fields_incomplete": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provenance",
+          "available_fields",
+          "available_fields_incomplete",
+          "truncated"
+        ]
+      },
+      "EventRead": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/EventPayload"
+          },
+          {
+            "$ref": "#/components/schemas/EventProjection"
+          }
+        ],
+        "description": "No projection parameters returns captured JSON; any of fields/max_bytes/include_enrichment selects the evidence projection."
+      },
+      "HistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "issue_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "from_status": {
+            "type": "string",
+            "enum": [
+              "unresolved",
+              "resolved",
+              "ignored",
+              "muted"
+            ]
+          },
+          "to_status": {
+            "type": "string",
+            "enum": [
+              "unresolved",
+              "resolved",
+              "ignored",
+              "muted"
+            ]
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string",
+            "const": "admin"
+          }
+        },
+        "required": [
+          "id",
+          "issue_id",
+          "from_status",
+          "to_status",
+          "changed_at",
+          "actor"
+        ]
+      },
+      "HistoryPage": {
+        "type": "object",
+        "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether another page exists. Follow next_cursor; next_offset is null on cursor requests even when more results exist."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "history",
+          "next_offset",
+          "has_more",
+          "next_cursor",
+          "provenance"
+        ]
+      },
+      "Release": {
+        "type": "object",
+        "properties": {
+          "release": {
+            "type": "string"
+          },
+          "event_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "release",
+          "event_count",
+          "first_seen",
+          "last_seen"
+        ]
+      },
+      "ReleasePage": {
+        "type": "object",
+        "properties": {
+          "releases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Release"
+            }
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "releases",
+          "next_offset"
+        ]
+      },
+      "Breakdown": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "value",
+                "count"
+              ]
+            }
+          },
+          "other_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "values",
+          "other_count",
+          "has_more"
+        ]
+      },
+      "Statistics": {
+        "type": "object",
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "matching_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unique_issues": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ]
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "bucket",
+                "count"
+              ]
+            }
+          },
+          "breakdowns": {
+            "type": "object",
+            "properties": {
+              "release": {
+                "$ref": "#/components/schemas/Breakdown"
+              },
+              "environment": {
+                "$ref": "#/components/schemas/Breakdown"
+              },
+              "level": {
+                "$ref": "#/components/schemas/Breakdown"
+              }
+            },
+            "required": [
+              "release",
+              "environment",
+              "level"
+            ]
+          },
+          "representative_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventMetadata"
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "total_count",
+          "matching_count",
+          "unique_issues",
+          "bucket",
+          "buckets",
+          "breakdowns",
+          "representative_events",
+          "provenance"
+        ]
+      },
+      "ProcessingHealth": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "pattern": "^[1-9]\\d{0,18}$"
+          },
+          "enrichment": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "const": "project"
+              },
+              "counts": {
+                "type": "object",
+                "properties": {
+                  "not_applicable": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "pending": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "succeeded": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "failed": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "not_applicable",
+                  "pending",
+                  "succeeded",
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "scope",
+              "counts"
+            ]
+          },
+          "source_maps": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "const": "project"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "scope",
+              "count"
+            ]
+          },
+          "processing_state": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "const": "global"
+              },
+              "source_maps": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "source_maps"
+                      },
+                      "last_started_at": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "date-time"
+                      },
+                      "last_finished_at": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "date-time"
+                      },
+                      "processed": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "failed": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "has_error": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "last_started_at",
+                      "last_finished_at",
+                      "processed",
+                      "failed",
+                      "has_error"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "scope",
+              "source_maps"
+            ]
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "project_id",
+          "enrichment",
+          "source_maps",
+          "processing_state",
+          "provenance"
+        ]
+      },
+      "SourceMap": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 3
+          },
+          "sources": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "names": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "mappings": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/;,]*$"
+          },
+          "file": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "sourceRoot": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "sourcesContent": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "debug_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+          },
+          "debugId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+          }
+        },
+        "required": [
+          "version",
+          "sources",
+          "names",
+          "mappings"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sections"
+              ]
+            },
+            {
+              "required": [
+                "url"
+              ]
+            }
+          ]
+        },
+        "description": "Flat Source Map v3. Runtime additionally validates VLQ values, mapping indices and <=50000 segments. sourcesContent length must match sources; an embedded debug ID must match the path case-insensitively. Source URLs are labels, never fetched."
+      },
+      "SourceMapMetadata": {
+        "type": "object",
+        "properties": {
+          "debug_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+          },
+          "checksum": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "debug_id",
+          "checksum",
+          "created_at"
+        ]
+      },
+      "IngestResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "JsonRpcRequest": {
+        "type": "object",
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "jsonrpc",
+          "method"
+        ]
+      },
+      "JsonRpcResponse": {
+        "type": "object",
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "result": {},
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              },
+              "data": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "jsonrpc",
+          "id"
+        ]
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "Server-generated request identifier.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "CacheControl": {
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Invalid identifier, query, body or protocol input.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Missing or invalid admin bearer token.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Invalid ingest credentials or rejected MCP Origin.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Project/resource not found within the requested project.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Debug ID already registered with different map content.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error413": {
+        "description": "Wire, decoded or output storage byte limit exceeded.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error415": {
+        "description": "Unsupported Content-Encoding.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "New events exceed the project UTC-hour quota.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "Internal storage or processing failure.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Admin secret is absent/empty or an indexed payload is unavailable.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ErrorMcp400": {
+        "description": "Malformed JSON-RPC or protocol input.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ErrorMcp406": {
+        "description": "Accept must include application/json and text/event-stream.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ErrorMcp413": {
+        "description": "MCP request exceeds 64 KiB.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ErrorMcp415": {
+        "description": "Content-Type must be application/json.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ErrorMcp500": {
+        "description": "SDK protocol failure or internal Worker error.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

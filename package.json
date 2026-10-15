@@ -1,0 +1,69 @@
+{
+  "name": "@bicho-fyi/core",
+  "version": "1.0.0",
+  "publishConfig": { "access": "public" },
+  "description": "Self-hosted OTLP error tracking and MCP investigation tools on Cloudflare Workers",
+  "files": ["src", "migrations", "scripts", "docs", "wrangler.jsonc", "tsconfig.json", ".nvmrc", ".dev.vars.example", "project.example.json", "project.example.sql", "AGENTS.md", "README.md", "ACKNOWLEDGEMENTS.md", "LICENSE"],
+  "cloudflare": {
+    "bindings": {
+      "BICHO_ADMIN_TOKEN": {
+        "description": "Generate a unique admin token with `openssl rand -hex 32` and save it securely. Required for API reads, project creation and MCP; never use an ingest key here."
+      }
+    }
+  },
+  "author": {
+    "name": "FreshJuice",
+    "email": "contact@freshjuice.dev",
+    "url": "https://freshjuice.dev/"
+  },
+  "contributors": [
+    {
+      "name": "Alex Zappa",
+      "email": "alex@zappa.dev",
+      "url": "https://alex.zappa.dev/"
+    }
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/bicho-fyi/bicho.git"
+  },
+  "homepage": "https://bicho.fyi",
+  "bugs": {
+    "url": "https://github.com/bicho-fyi/bicho/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:node": "vitest run --project node",
+    "test:workers": "vitest run --project workers",
+    "project": "node scripts/project.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.0",
+    "@cloudflare/workers-types": "5.20261012.1",
+    "@opentelemetry/exporter-logs-otlp-http": "0.223.0",
+    "@opentelemetry/exporter-logs-otlp-proto": "0.223.0",
+    "@opentelemetry/resources": "2.9.0",
+    "@opentelemetry/sdk-logs": "0.223.0",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.4",
+    "wrangler": "4.149.0"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "@jridgewell/trace-mapping": "0.3.31",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "hono": "4.13.13",
+    "zod": "4.6.6"
+  }
+}

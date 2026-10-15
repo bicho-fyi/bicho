@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+.env*
+_temp/
+.DS_Store
+!src/vendor/otlp/opentelemetry/proto/logs/
+!src/vendor/otlp/opentelemetry/proto/collector/logs/

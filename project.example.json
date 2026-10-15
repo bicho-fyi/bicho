@@ -1,0 +1,7 @@
+{
+  "project_id": "1",
+  "otlp": {
+    "endpoint": "https://your-worker.example/v1/logs",
+    "headers": { "X-Bicho-Key": "YOUR_PUBLIC_KEY" }
+  }
+}
