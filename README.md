@@ -6,15 +6,15 @@
 [![Node.js 24](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white)](package.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-Bicho is a self-hosted error tracker on Cloudflare Workers. Send exception and error logs over OTLP/HTTP, inspect grouped issues through the API or MCP, and keep the captured evidence in your own D1 database and R2 bucket.
+Bicho is a self-hosted error tracker on Cloudflare Workers. Send exception and error logs over OTLP/HTTP or from Sentry SDKs, inspect grouped issues through the API or MCP, and keep the captured evidence in your own D1 database and R2 bucket.
 
-It accepts OTLP JSON and binary protobuf logs. You can use it without a dashboard or an OpenTelemetry Collector.
+It accepts OTLP JSON and binary protobuf logs, plus Sentry error envelopes and legacy store requests. You can use it without a dashboard or an OpenTelemetry Collector.
 
 ## SDKs
 
 - [JavaScript / TypeScript](https://github.com/bicho-fyi/bicho-javascript): [`@bicho-fyi/javascript`](https://www.npmjs.com/package/@bicho-fyi/javascript), with automatic browser error capture and explicit backend reporting in Node.js.
 
-For other languages, use an OpenTelemetry logs exporter with OTLP/HTTP JSON or protobuf.
+You can also keep an existing Sentry SDK and point it at Bicho. For other integrations, use an OpenTelemetry logs exporter with OTLP/HTTP JSON or protobuf.
 
 ## Deploy to Cloudflare
 
@@ -27,7 +27,7 @@ The deploy script applies database migrations before deploying the Worker. Your 
 After deployment:
 
 1. Connect your MCP client to `https://<your-worker>/mcp` using the admin bearer token.
-2. Call `create_project` with `{ "name": "My app" }`. It creates the database record and returns a generated project ID, OTLP endpoint and ingest headers. No local SQL or direct database access is needed.
+2. Call `create_project` with `{ "name": "My app" }`. It creates the database record and returns a generated project ID, OTLP configuration and Sentry DSN. No local SQL or direct database access is needed.
 3. Save the returned headers and configure your application's exporter or SDK. Use `secret: true` only for backend projects.
 
 For a custom domain, configure the route and disable `workers_dev` when you no longer need that alternate endpoint. See [Cloudflare's deploy-button documentation](https://developers.cloudflare.com/workers/platform/deploy-buttons/) for platform setup details.
@@ -71,7 +71,44 @@ The initial migration is for a fresh database. Editing it does not upgrade a dat
 
 On a running local or hosted Worker, call MCP `create_project` with `{ "name": "My app" }`, or send the same JSON to `POST /api/projects` with the admin bearer token. The optional `hourly_limit` accepts an integer from 1 to 1000000 (default 1000). Set `secret: true` to require an additional backend ingest secret.
 
-The API returns HTTP 201 with `{ project: { id, name, hourly_limit }, otlp: { endpoint, headers } }`. The server generates a unique numeric-string ID and random ingest credentials. Save the returned headers securely: project listings do not expose credentials, and only the ingest secret's hash is stored. IDs cannot be supplied, and registration never replaces or deletes existing projects. Each call creates a new project, even with the same name; check `list_projects` before retrying after a lost response.
+The API returns HTTP 201 with `{ project: { id, name, hourly_limit }, otlp: { endpoint, headers }, sentry: { dsn, headers? } }`. The server generates a unique numeric-string ID and random ingest credentials. Save the returned headers securely: project listings do not expose credentials, and only the ingest secret's hash is stored. IDs cannot be supplied, and registration never replaces or deletes existing projects. Each call creates a new project, even with the same name; check `list_projects` before retrying after a lost response.
+
+## Move from Sentry
+
+Create a Bicho project through MCP or the API and use its returned `sentry.dsn` in your existing Sentry SDK configuration. You keep your application's error-capture code; Bicho receives and groups the events.
+
+For JavaScript, using your existing `@sentry/browser` or `@sentry/node` import:
+
+```js
+Sentry.init({
+  dsn: "https://YOUR_PUBLIC_KEY@your-bicho-worker.example/PROJECT_ID",
+  tracesSampleRate: 0,
+  sendClientReports: false,
+});
+```
+
+Use the generated DSN rather than the placeholder above. Keep error-capture integrations; remove integrations that send replay, profiling, tracing or structured logs. Bicho stores error/message events, not those other data types. Release, environment, tags, custom fingerprints, stack frames, breadcrumbs and contexts remain available through the same API and MCP tools as OTLP events. This changes where new errors go; it does not import historical Sentry data or reproduce Sentry's grouping rules.
+
+For a secret-enabled backend project, pass the generated `sentry.headers` using the SDK's transport headers. With `@sentry/node`:
+
+```js
+Sentry.init({
+  dsn: project.sentry.dsn,
+  transportOptions: { headers: project.sentry.headers },
+  tracesSampleRate: 0,
+  sendClientReports: false,
+});
+```
+
+Browser projects must not require an ingest secret. Keep the admin token out of SDK configuration. For SDKs without custom-header support, use a public-key-only project or a transport that supplies the required backend secret; a DSN alone cannot bypass it.
+
+Bicho accepts `POST /api/:project_id/envelope/` and raw JSON at the legacy `POST /api/:project_id/store/` endpoint. Query authentication (`sentry_version=7&sentry_key=...`), `X-Sentry-Auth`, and self-authenticating envelope DSNs are supported. Supplied credentials must agree with each other and the project. Envelope DSNs must use this installation's origin. Authentication never forwards requests to Sentry.
+
+Requests support gzip and deflate compression via `Content-Encoding`. They are limited to 2 MiB on the wire and after decompression, 1 MiB per error event, 100 envelope items, 32 JSON nesting levels and 20,000 structural values per parsed object. Brotli, zstd, base64-wrapped legacy payloads, minidumps and Sentry artifact-bundle uploads are not supported. Upload source maps through Bicho's authenticated map API; captured frames or `debug_meta.images` must supply matching debug IDs.
+
+Successful responses include `accepted`, `rejected` and `discarded`. Unsupported item types, including attachments and sessions, are skipped and counted in `discarded`; their payloads are not stored. Malformed error events reject the batch before persistence. Quota rejection before acceptance returns 429 with `Retry-After` and `X-Sentry-Rate-Limits`; a storage failure returns 503. After an accepted prefix, Bicho returns 200 and lists rejected IDs so clients do not replay the accepted batch. Standard SDKs may ignore that body and drop the rejected remainder. When explicitly resending individual events, keep their `event_id`; retries deduplicate within a project.
+
+Interoperability tests exercise `@sentry/node` and `@sentry/browser` 11.8.0 serialization and transports, including real HTTP delivery, plus browser-client delivery inside workerd. Compatibility with another SDK depends on its transport and emitted event format.
 
 ## OpenTelemetry ingestion
 
@@ -155,7 +192,9 @@ Send `Authorization: Bearer <BICHO_ADMIN_TOKEN>` on every read, issue PATCH, sou
 - `GET /api/:project_id/events/:id`: full event JSON
 - `GET /api/:project_id/releases`: `{ releases, next_offset }`, derived from stored events
 - `GET /api/projects`: project IDs, names, and hourly quotas, without ingest credentials
-- `POST /api/projects`: register a project; returns its generated ID and OTLP ingest credentials
+- `POST /api/projects`: register a project; returns its generated ID, OTLP credentials and Sentry DSN
+- `POST /api/:project_id/envelope/`: ingest Sentry error envelopes
+- `POST /api/:project_id/store/`: ingest legacy Sentry error JSON
 - `GET /api/:project_id/events`: searchable event metadata
 - `GET /api/:project_id/issues/:id/history`: recorded status transitions
 - `GET /api/:project_id/stats`: deterministic counts, UTC buckets, breakdowns, and representative event metadata
@@ -214,7 +253,7 @@ Bicho stores errors and their derived source-map results. It does not provide at
 
 Connect to `POST /mcp` with your admin bearer token. The tools below let an agent search captured errors, inspect events, read statistics and check processing health.
 
-`create_project` registers a project and returns its generated ID and OTLP credentials. `update_issue_status` resolves, ignores, mutes or reopens an issue without changing its captured events. Status changes are recorded in history. Neither tool can delete data or replace an existing project.
+`create_project` registers a project and returns its generated ID, OTLP credentials and Sentry DSN. `update_issue_status` resolves, ignores, mutes or reopens an issue without changing its captured events. Status changes are recorded in history. Neither tool can delete data or replace an existing project.
 
 All tools use the authenticated HTTP API. Release summaries come from captured event metadata.
 

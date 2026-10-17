@@ -40,6 +40,10 @@ test("repository OpenAPI covers every explicit route without exposing docs on th
         assert.deepEqual(item.get.security, []);
         continue;
       }
+      if (path.endsWith("/envelope") || path.endsWith("/store")) {
+        assert.ok(item.post.security.some(scheme => "SentryQuery" in scheme));
+        continue;
+      }
       if (path === "/v1/logs") {
         assert.deepEqual(item.post.security, [{ OTLPIngest: [] }]);
         continue;
@@ -69,6 +73,13 @@ test("actual success and auth-error responses match the repository contract", as
     const event = { event_id: "a".repeat(32), message: "contract", timestamp: "2026-10-01T10:00:00Z", tags: { route: "/test" }, release: "v1" };
     assert.equal((await capture(b.env, event)).status, 200);
     await validate("/v1/logs", "post", await call("/v1/logs", { method: "POST", headers: { "Content-Type": "application/json", "X-Bicho-Key": "public" }, body: JSON.stringify(logs([log("contract")])) }));
+    for (const endpoint of ["envelope", "store"]) {
+      const event = JSON.stringify({ event_id: "c".repeat(32), message: "Sentry contract" });
+      const body = endpoint === "store" ? event : '{}\n{"type":"event"}\n' + event;
+      const path = `/api/1/${endpoint}?sentry_version=7&sentry_key=public`;
+      await validate(`/api/{project_id}/${endpoint}`, "post", await call(path, { method: "POST", body }));
+      await validate(`/api/{project_id}/${endpoint}`, "post", await call(`/api/1/${endpoint}`, { method: "POST", body }));
+    }
     const { value: projects, check } = await validate("/api/projects", "get", await call("/api/projects", { headers: auth }));
     assert.equal(check({ ...projects, projects: [{ id: 1 }] }).valid, false);
     await validate("/api/projects", "post", await call("/api/projects", { method: "POST", headers: auth, body: '{"name":"contract project","secret":true}' }));

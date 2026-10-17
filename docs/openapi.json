@@ -3,7 +3,7 @@
   "info": {
     "title": "Bicho core API",
     "version": "1.0.0",
-    "description": "Self-hosted OTLP/HTTP error-log ingestion, append-only evidence, authenticated investigation reads, explicit issue state and MCP issue-status updates. This file is repository documentation only: the Worker serves no OpenAPI/Swagger/docs route. CORS preflights and automatic HEAD responses on read routes are transport behavior, not listed operations.",
+    "description": "Self-hosted OTLP/HTTP and Sentry SDK error ingestion, append-only evidence, authenticated investigation reads, explicit issue state and MCP issue-status updates. This file is repository documentation only: the Worker serves no OpenAPI/Swagger/docs route. CORS preflights and automatic HEAD responses on read routes are transport behavior, not listed operations.",
     "license": {
       "name": "Apache-2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0"
@@ -30,6 +30,240 @@
     }
   ],
   "paths": {
+    "/api/{project_id}/envelope": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "post": {
+        "operationId": "ingestSentryEnvelope",
+        "summary": "Accept Sentry envelope error events",
+        "description": "Sentry protocol v7 authentication via query, X-Sentry-Auth or envelope DSN (envelope endpoint only). All supplied credentials and route project must agree; DSN origin must match this installation. Secret-enabled projects additionally require X-Bicho-Secret or matching sentry_secret. Query/header authentication requires sentry_version=7. 2 MiB wire/decoded body, 1 MiB per event, 100 envelope items, 32 nesting levels and 20000 JSON values per parsed object. Raw JSON legacy store only; no base64 wrapping. Gzip/deflate supported via Content-Encoding. Unsupported envelope items are discarded and counted without storage. Batch validation precedes persistence. Whole failures use 429/503; after an accepted prefix HTTP 200 reports rejected IDs without encouraging whole-envelope retry. SDKs may ignore the partial response body. Reuse event_id when explicitly resending individual rejected events.",
+        "security": [
+          {
+            "SentryQuery": []
+          },
+          {
+            "SentryHeader": []
+          },
+          {
+            "SentryEnvelope": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sentry_key",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sentry_version",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7"
+              ]
+            }
+          },
+          {
+            "name": "sentry_secret",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Bicho-Secret",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Encoding",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "identity",
+                "gzip",
+                "deflate"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-sentry-envelope": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted error event IDs, rejected IDs and discarded unsupported-item counts. Quota-limited partial success may include X-Sentry-Rate-Limits.",
+            "headers": {
+              "X-Sentry-Rate-Limits": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Sentry error-category backoff, also present on 429."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SentryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/{project_id}/store": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ],
+      "post": {
+        "operationId": "ingestSentryStore",
+        "summary": "Accept Sentry store error events",
+        "description": "Sentry protocol v7 authentication via query, X-Sentry-Auth or envelope DSN (envelope endpoint only). All supplied credentials and route project must agree; DSN origin must match this installation. Secret-enabled projects additionally require X-Bicho-Secret or matching sentry_secret. Query/header authentication requires sentry_version=7. 2 MiB wire/decoded body, 1 MiB per event, 100 envelope items, 32 nesting levels and 20000 JSON values per parsed object. Raw JSON legacy store only; no base64 wrapping. Gzip/deflate supported via Content-Encoding. Unsupported envelope items are discarded and counted without storage. Batch validation precedes persistence. Whole failures use 429/503; after an accepted prefix HTTP 200 reports rejected IDs without encouraging whole-envelope retry. SDKs may ignore the partial response body. Reuse event_id when explicitly resending individual rejected events.",
+        "security": [
+          {
+            "SentryQuery": []
+          },
+          {
+            "SentryHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sentry_key",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sentry_version",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7"
+              ]
+            }
+          },
+          {
+            "name": "sentry_secret",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Bicho-Secret",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Encoding",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "identity",
+                "gzip",
+                "deflate"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted error event IDs, rejected IDs and discarded unsupported-item counts. Quota-limited partial success may include X-Sentry-Rate-Limits.",
+            "headers": {
+              "X-Sentry-Rate-Limits": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Sentry error-category backoff, also present on 429."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SentryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
     "/v1/logs": {
       "post": {
         "operationId": "ingestOtlpLogs",
@@ -288,9 +522,10 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["project", "otlp"],
+                  "required": ["project", "otlp", "sentry"],
                   "properties": {
                     "project": { "$ref": "#/components/schemas/Project" },
+                    "sentry": { "$ref": "#/components/schemas/SentryConfiguration" },
                     "otlp": {
                       "type": "object",
                       "required": ["endpoint", "headers"],
@@ -1234,6 +1469,23 @@
   },
   "components": {
     "securitySchemes": {
+      "SentryQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "sentry_key",
+        "description": "Project ingest key with sentry_version=7. Optional backend secret required for secret-enabled projects."
+      },
+      "SentryHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Sentry-Auth",
+        "description": "Sentry sentry_version=7,sentry_key=<key>, optional sentry_secret=<secret>."
+      },
+      "SentryEnvelope": {
+        "type": "http",
+        "scheme": "sentry-envelope",
+        "description": "Custom scheme carried as dsn in the envelope JSON header, not an Authorization header; OpenAPI cannot natively model body-based authentication."
+      },
       "OTLPIngest": {
         "type": "apiKey",
         "in": "header",
@@ -1471,6 +1723,70 @@
       }
     },
     "schemas": {
+      "SentryResult": {
+        "type": "object",
+        "required": [
+          "accepted",
+          "rejected",
+          "discarded"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "accepted": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          },
+          "discarded": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "SentryConfiguration": {
+        "type": "object",
+        "required": [
+          "dsn"
+        ],
+        "properties": {
+          "dsn": {
+            "type": "string",
+            "format": "uri",
+            "description": "Sentry SDK DSN using this project public ingest key; never an admin credential."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "X-Bicho-Secret"
+            ],
+            "properties": {
+              "X-Bicho-Secret": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      },
       "OtlpExportResponse": {
         "type": "object",
         "properties": {
