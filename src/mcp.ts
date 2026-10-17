@@ -55,7 +55,7 @@ export async function handleMcp(request: Request, api: (path: string, init?: Req
     return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result, isError: !response.ok };
   }
   server.registerTool("create_project", {
-    description: "Register a new project with a server-generated numeric ID and random ingest credentials. Returns project and OTLP endpoint/headers; save credentials securely. Cannot replace or delete projects. Each call creates a new project; do not retry blindly after a lost response.",
+    description: "Register a new project with a server-generated numeric ID and random ingest credentials. Returns project, OTLP endpoint/headers and Sentry DSN with required backend headers; save credentials securely. Cannot replace or delete projects. Each call creates a new project; do not retry blindly after a lost response.",
     inputSchema: { name: z.string().trim().min(1).max(512), hourly_limit: z.number().int().min(1).max(1000000).optional(), secret: z.boolean().optional() },
     annotations: { ...annotations, readOnlyHint: false, idempotentHint: false },
   }, input => callApi("/api/projects", { method: "POST", body: JSON.stringify(input) }));

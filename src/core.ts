@@ -166,6 +166,8 @@ export async function createProject(request: Request, env: Env): Promise<Respons
     if (project) return Response.json({ project, otlp: {
       endpoint: `${new URL(request.url).origin}/v1/logs`,
       headers: { "X-Bicho-Key": publicKey, ...(secret ? { "X-Bicho-Secret": secret } : {}) },
+    }, sentry: { dsn: `${new URL(request.url).protocol}//${publicKey}@${new URL(request.url).host}/${id}`,
+      ...(secret ? { headers: { "X-Bicho-Secret": secret } } : {}),
     } }, { status: 201 });
   }
   throw new HttpError(503, "Could not allocate project credentials");

@@ -3,5 +3,6 @@
   "otlp": {
     "endpoint": "https://your-worker.example/v1/logs",
     "headers": { "X-Bicho-Key": "YOUR_PUBLIC_KEY" }
-  }
+  },
+  "sentry": { "dsn": "https://YOUR_PUBLIC_KEY@your-worker.example/1" }
 }

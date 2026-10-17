@@ -28,7 +28,8 @@ test("project provisioning writes valid SQL and private credentials without over
     assert.ok(!("read_token_hash" in row));
     assert.ok(!("read_token" in credentials));
     assert.ok(!("BICHO_ADMIN_TOKEN" in credentials));
-    assert.deepEqual(Object.keys(credentials).sort(), ["otlp", "project_id"]);
+    assert.deepEqual(Object.keys(credentials).sort(), ["otlp", "project_id", "sentry"]);
+    assert.deepEqual(credentials.sentry, { dsn: `https://${row.public_key}@bicho.test/1`, headers: { "X-Bicho-Secret": credentials.otlp.headers["X-Bicho-Secret"] } });
     assert.equal(row.public_key, credentials.otlp.headers["X-Bicho-Key"]);
     assert.equal(row.secret_hash, createHash("sha256").update(credentials.otlp.headers["X-Bicho-Secret"]).digest("hex"));
     assert.deepEqual(credentials.otlp, {
@@ -36,6 +37,7 @@ test("project provisioning writes valid SQL and private credentials without over
       headers: { "X-Bicho-Key": credentials.otlp.headers["X-Bicho-Key"], "X-Bicho-Secret": credentials.otlp.headers["X-Bicho-Secret"] },
     });
     const browserCredentials = JSON.parse(readFileSync(resolve(cwd, "_temp/project-2.json"), "utf8"));
+    assert.deepEqual(browserCredentials.sentry, { dsn: `https://${browserCredentials.otlp.headers["X-Bicho-Key"]}@bicho.test/2` });
     assert.deepEqual(browserCredentials.otlp, {
       endpoint: "https://bicho.test/v1/logs",
       headers: { "X-Bicho-Key": browserCredentials.otlp.headers["X-Bicho-Key"] },

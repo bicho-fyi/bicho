@@ -27,6 +27,7 @@ try {
   writeFileSync(credentialsFile, JSON.stringify({
     project_id: id,
     otlp: { endpoint: `${url.origin}/v1/logs`, headers: { "X-Bicho-Key": publicKey, ...(secret ? { "X-Bicho-Secret": secret } : {}) } },
+    sentry: { dsn: `${url.protocol}//${publicKey}@${url.host}/${id}`, ...(secret ? { headers: { "X-Bicho-Secret": secret } } : {}) },
   }, null, 2) + "\n", { flag: "wx", mode: 0o600 });
   console.log(`SQL: ${sqlFile}\nCredentials: ${credentialsFile}`);
 } catch (error) {

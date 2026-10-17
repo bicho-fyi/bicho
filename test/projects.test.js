@@ -27,6 +27,8 @@ test("project registration is admin-only, generates credentials, and never repla
       registrations.push(value);
       assert.match(value.project.id, /^[1-9]\d{0,18}$/);
       assert.deepEqual(value.project, { id: value.project.id, name: "test", hourly_limit: 25 });
+      assert.equal(value.sentry.dsn, `https://${value.otlp.headers["X-Bicho-Key"]}@bicho.test/${value.project.id}`);
+      assert.deepEqual(value.sentry.headers, secret ? { "X-Bicho-Secret": value.otlp.headers["X-Bicho-Secret"] } : undefined);
       assert.equal(value.otlp.endpoint, "https://bicho.test/v1/logs");
       assert.match(value.otlp.headers["X-Bicho-Key"], /^[a-f0-9]{32}$/);
       const row = sqlite.prepare("SELECT * FROM projects WHERE id=?").get(value.project.id);
