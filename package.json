@@ -1,9 +1,26 @@
 {
   "name": "@bicho-fyi/core",
   "version": "1.0.0",
-  "publishConfig": { "access": "public" },
-  "description": "Self-hosted OTLP error tracking and MCP investigation tools on Cloudflare Workers",
-  "files": ["src", "migrations", "scripts", "docs", "wrangler.jsonc", "tsconfig.json", ".nvmrc", ".dev.vars.example", "project.example.json", "project.example.sql", "AGENTS.md", "README.md", "ACKNOWLEDGEMENTS.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Self-hosted OTLP and Sentry-compatible error tracking with MCP investigation tools on Cloudflare Workers",
+  "files": [
+    "src",
+    "migrations",
+    "scripts",
+    "docs",
+    "wrangler.jsonc",
+    "tsconfig.json",
+    ".nvmrc",
+    ".dev.vars.example",
+    "project.example.json",
+    "project.example.sql",
+    "AGENTS.md",
+    "README.md",
+    "ACKNOWLEDGEMENTS.md",
+    "LICENSE"
+  ],
   "cloudflare": {
     "bindings": {
       "BICHO_ADMIN_TOKEN": {
@@ -53,6 +70,8 @@
     "@opentelemetry/exporter-logs-otlp-proto": "0.223.0",
     "@opentelemetry/resources": "2.9.0",
     "@opentelemetry/sdk-logs": "0.223.0",
+    "@sentry/browser": "11.8.0",
+    "@sentry/node": "11.8.0",
     "@types/node": "24.19.2",
     "typescript": "7.0.2",
     "vite": "8.3.4",

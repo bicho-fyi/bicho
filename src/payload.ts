@@ -2,7 +2,7 @@ import { HttpError, object, type JsonObject } from "./http.ts";
 import type { Env } from "./core.ts";
 
 const encoder = new TextEncoder();
-const sensitive = /^(?:http\.(?:request|response)\.header\.)?(?:authorization|proxy[-_]?authorization|cookie|set[-_]?cookie|password|passwd|secret|client[-_]?secret|.*[-_]?token|(?:x[-_])?api[-_]?key|access[-_]?key|private[-_]?key)$/i;
+const sensitive = /^(?:http\.(?:request|response)\.header\.)?(?:sentry_(?:key|secret)|x[-_]sentry[-_]auth|authorization|proxy[-_]?authorization|cookie|set[-_]?cookie|password|passwd|secret|client[-_]?secret|.*[-_]?token|(?:x[-_])?api[-_]?key|access[-_]?key|private[-_]?key)$/i;
 
 export function redact(value: unknown, depth = 0, pairs = false): unknown {
   if (depth > 64) throw new HttpError(400, "Event nesting exceeds limit");

@@ -5,6 +5,7 @@ import { requestId, type RequestIdVariables } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { listIssues, getIssue, getEvent, listProjects, createProject, listReleases, patchIssue, authenticateAdmin, type Env, type Project } from "./core.ts";
 import { ingestLogs, otlpError } from "./otlp.ts";
+import { ingestSentry, sentryError } from "./sentry.ts";
 import { HttpError } from "./http.ts";
 import { handleMcp } from "./mcp.ts";
 import { searchEvents, issueHistory, eventStats, processingHealth } from "./investigation.ts";
@@ -102,6 +103,20 @@ app.use("/v1/logs", cors({
 app.post("/v1/logs", async c => ingestLogs(c.req.raw, c.env));
 app.all("/v1/logs", c => otlpError(c.req.raw, new HttpError(405, "Method not allowed", { Allow: "POST, OPTIONS" })));
 
+for (const endpoint of ["envelope", "store"]) {
+  const path = `/api/:project_id/${endpoint}`;
+  app.use(path, cors({
+    origin: "*", allowMethods: ["POST", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Content-Encoding", "X-Sentry-Auth", "X-Bicho-Secret"],
+    exposeHeaders: ["Retry-After", "X-Sentry-Rate-Limits", "X-Request-ID"], credentials: false, maxAge: 600,
+  }));
+}
+app.post("/api/:project_id/envelope", c => ingestSentry(c.req.raw, c.env, c.req.param("project_id")));
+app.post("/api/:project_id/store", c => ingestSentry(c.req.raw, c.env, c.req.param("project_id"), true));
+for (const endpoint of ["envelope", "store"]) {
+  app.all(`/api/:project_id/${endpoint}`, () => sentryError(new HttpError(405, "Method not allowed", { Allow: "POST, OPTIONS" })));
+}
+
 app.get("/api/projects", adminAuth, c => listProjects(new URL(c.req.url), c.env));
 app.post("/api/projects", adminAuth, c => createProject(c.req.raw, c.env));
 app.get("/api/:project_id/issues", adminAuth, project, c => listIssues(new URL(c.req.url), c.env, c.get("project")));
@@ -123,6 +138,10 @@ for (const path of readPaths) {
 }
 app.notFound(c => c.json({ error: "Not found" }, 404));
 app.onError((error, c) => {
+  if (/^\/api\/[^/]+\/(envelope|store)\/?$/.test(c.req.path)) {
+    if (!(error instanceof HttpError)) console.error(JSON.stringify({ message: "Sentry ingestion failed", request_id: c.get("requestId"), error: error.name }));
+    return sentryError(error);
+  }
   if (c.req.path.replace(/\/$/, "") === "/v1/logs") {
     if (!(error instanceof HttpError)) console.error(JSON.stringify({ message: "OTLP ingestion failed", request_id: c.get("requestId"), error: error.name }));
     return otlpError(c.req.raw, error);
@@ -140,7 +159,7 @@ const worker = {
   fetch: async (request: Request, env: Env, ctx?: ExecutionContext) => {
     const response = await app.fetch(request, env, ctx);
     const path = new URL(request.url).pathname;
-    if (ctx && response.ok && ((request.method === "POST" && /^\/v1\/logs\/?$/.test(path)) || (request.method === "PUT" && /^\/api\/\d+\/sourcemaps\//.test(path)))) {
+    if (ctx && response.ok && ((request.method === "POST" && /^(?:\/v1\/logs|\/api\/\d+\/(?:envelope|store))\/?$/.test(path)) || (request.method === "PUT" && /^\/api\/\d+\/sourcemaps\//.test(path)))) {
       ctx.waitUntil(processEnrichment(env).catch(() => { console.error(JSON.stringify({ message: "Source map processing failed" })); }));
     }
     return response;
