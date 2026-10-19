@@ -1,6 +1,6 @@
 # Bicho
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](package.json)
+[![Source version](https://img.shields.io/github/package-json/v/bicho-fyi/bicho)](package.json)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/workers/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js 24](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white)](package.json)
