@@ -12,9 +12,17 @@ It accepts OTLP JSON and binary protobuf logs, plus Sentry error envelopes and l
 
 ## SDKs
 
-- [JavaScript / TypeScript](https://github.com/bicho-fyi/bicho-javascript): [`@bicho-fyi/javascript`](https://www.npmjs.com/package/@bicho-fyi/javascript), with automatic browser error capture and explicit backend reporting in Node.js.
+| SDK or integration | Package | Capture and delivery |
+| --- | --- | --- |
+| [JavaScript / TypeScript](https://github.com/bicho-fyi/bicho-javascript) | [`@bicho-fyi/javascript`](https://www.npmjs.com/package/@bicho-fyi/javascript) | Automatic browser capture and explicit Node.js reporting; queued delivery with flush/close. |
+| [PHP](https://github.com/bicho-fyi/bicho-php) | [`bicho-fyi/php`](https://packagist.org/packages/bicho-fyi/php) | Explicit capture with synchronous delivery; PHP 8.2+. |
+| [Rust](https://github.com/bicho-fyi/bicho-rust) | [`bicho`](https://crates.io/crates/bicho) | Explicit, awaited delivery on Tokio, including the Rust side of Tauri apps. |
+| [Python](https://github.com/bicho-fyi/bicho-python) | `bicho-fyi` ([install from Git](https://bicho.fyi/docs/python/#install-from-git)) | Explicit capture with synchronous delivery; Python 3.11+. |
+| [Astro](https://github.com/bicho-fyi/bicho-astro) | `@bicho-fyi/astro` ([source](https://github.com/bicho-fyi/bicho-astro)) | Opt-in browser capture and server request-exception reporting with separate project settings. |
 
-You can also keep an existing Sentry SDK and point it at Bicho. For other integrations, use an OpenTelemetry logs exporter with OTLP/HTTP JSON or protobuf.
+See the [SDK guides](https://bicho.fyi/docs/sdks/) and [runnable examples](https://github.com/bicho-fyi/bicho-examples) for setup and delivery behavior. The Astro integration's README covers its configuration and capture limits.
+
+You can also [keep an existing Sentry SDK and replace its DSN](https://bicho.fyi/docs/sentry/). For other integrations, use an OpenTelemetry logs exporter with OTLP/HTTP JSON or protobuf.
 
 ## Deploy to Cloudflare
 
