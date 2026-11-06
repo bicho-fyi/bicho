@@ -18,9 +18,10 @@ It accepts OTLP JSON and binary protobuf logs, plus Sentry error envelopes and l
 | [PHP](https://github.com/bicho-fyi/bicho-php) | [`bicho-fyi/php`](https://packagist.org/packages/bicho-fyi/php) | Explicit capture with synchronous delivery; PHP 8.2+. |
 | [Rust](https://github.com/bicho-fyi/bicho-rust) | [`bicho`](https://crates.io/crates/bicho) | Explicit, awaited delivery on Tokio, including the Rust side of Tauri apps. |
 | [Python](https://github.com/bicho-fyi/bicho-python) | `bicho-fyi` ([install from Git](https://bicho.fyi/docs/python/#install-from-git)) | Explicit capture with synchronous delivery; Python 3.11+. |
-| [Astro](https://github.com/bicho-fyi/bicho-astro) | `@bicho-fyi/astro` ([source](https://github.com/bicho-fyi/bicho-astro)) | Opt-in browser capture and server request-exception reporting with separate project settings. |
+| [Astro](https://github.com/bicho-fyi/bicho-astro) | [`@bicho-fyi/astro`](https://www.npmjs.com/package/@bicho-fyi/astro) | Opt-in browser capture and server request-exception reporting with separate project settings. |
+| [WordPress](https://github.com/bicho-fyi/bicho-wordpress) | [`bicho-error-tracking.zip`](https://github.com/bicho-fyi/bicho-wordpress/releases/tag/v1.0.0) | Opt-in PHP warning/fatal reporting and frontend browser capture with independent settings. |
 
-See the [SDK guides](https://bicho.fyi/docs/sdks/) and [runnable examples](https://github.com/bicho-fyi/bicho-examples) for setup and delivery behavior. The Astro integration's README covers its configuration and capture limits.
+See the [SDK guides](https://bicho.fyi/docs/sdks/) and [runnable examples](https://github.com/bicho-fyi/bicho-examples) for setup and delivery behavior.
 
 You can also [keep an existing Sentry SDK and replace its DSN](https://bicho.fyi/docs/sentry/). For other integrations, use an OpenTelemetry logs exporter with OTLP/HTTP JSON or protobuf.
 
