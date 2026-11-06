@@ -1,6 +1,6 @@
 {
   "name": "@bicho-fyi/core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publishConfig": {
     "access": "public"
   },
@@ -64,8 +64,8 @@
     "project": "node scripts/project.ts"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "1.4.0",
-    "@cloudflare/workers-types": "5.20261012.1",
+    "@cloudflare/vitest-plugin": "1.4.6",
+    "@cloudflare/workers-types": "5.20261021.1",
     "@opentelemetry/exporter-logs-otlp-http": "0.223.0",
     "@opentelemetry/exporter-logs-otlp-proto": "0.223.0",
     "@opentelemetry/resources": "2.9.0",
@@ -74,15 +74,15 @@
     "@sentry/node": "11.8.0",
     "@types/node": "24.19.2",
     "typescript": "7.0.2",
-    "vite": "8.3.4",
-    "vitest": "5.0.4",
-    "wrangler": "4.149.0"
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "wrangler": "4.151.3"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.16.0",
     "@jridgewell/trace-mapping": "0.3.31",
     "@modelcontextprotocol/sdk": "1.32.1",
     "hono": "4.13.13",
-    "zod": "4.6.6"
+    "zod": "4.6.7"
   }
 }

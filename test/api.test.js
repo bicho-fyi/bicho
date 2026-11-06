@@ -32,7 +32,7 @@ test("MCP client discovers investigation and status tools backed by the authenti
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.deepEqual(tools.map(tool => tool.name).sort(), ["create_project", "get_event", "get_issue", "get_issue_history", "get_processing_health", "get_stats", "list_projects", "list_releases", "search_events", "search_issues", "update_issue_status"]);
+    assert.deepEqual(tools.map(tool => tool.name).sort(), ["create_project", "get_event", "get_issue", "get_issue_history", "get_processing_health", "get_project", "get_stats", "list_projects", "list_releases", "search_events", "search_issues", "update_issue_status"]);
     assert.ok(tools.filter(tool => !["create_project", "update_issue_status"].includes(tool.name)).every(tool => tool.annotations.readOnlyHint === true));
     assert.deepEqual(tools.find(tool => tool.name === "update_issue_status").annotations, { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
     assert.deepEqual(tools.find(tool => tool.name === "create_project").annotations, { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
@@ -56,6 +56,7 @@ test("MCP client discovers investigation and status tools backed by the authenti
     assert.equal(JSON.parse(payload.content[0].text).provenance.untrusted, true);
     for (const [name, args, path] of [
       ["list_projects", {}, "/api/projects"],
+      ["get_project", { project_id: "1" }, "/api/projects/1"],
       ["search_events", { project_id: "1", tags: { route: "/checkout" } }, "/api/1/events"],
       ["get_stats", { project_id: "1" }, "/api/1/stats"],
       ["get_issue_history", { project_id: "1", id: issues[0].id }, `/api/1/issues/${issues[0].id}/history`],

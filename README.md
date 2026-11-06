@@ -81,6 +81,8 @@ On a running local or hosted Worker, call MCP `create_project` with `{ "name": "
 
 The API returns HTTP 201 with `{ project: { id, name, hourly_limit }, otlp: { endpoint, headers }, sentry: { dsn, headers? } }`. The server generates a unique numeric-string ID and random ingest credentials. Save the returned headers securely: project listings do not expose credentials, and only the ingest secret's hash is stored. IDs cannot be supplied, and registration never replaces or deletes existing projects. Each call creates a new project, even with the same name; check `list_projects` before retrying after a lost response.
 
+To recover an existing project's configuration instead of registering another, call MCP `get_project` or `GET /api/projects/<project-id>` with the admin bearer token. It returns the same `project`, `otlp` and `sentry` values plus `secret_required`. Only the public ingest key is recoverable; a project created with `secret: true` still needs its secret, which is stored as a hash and cannot be read back.
+
 ## Move from Sentry
 
 Create a Bicho project through MCP or the API and use its returned `sentry.dsn` in your existing Sentry SDK configuration. You keep your application's error-capture code; Bicho receives and groups the events.
@@ -261,7 +263,7 @@ Bicho stores errors and their derived source-map results. It does not provide at
 
 Connect to `POST /mcp` with your admin bearer token. The tools below let an agent search captured errors, inspect events, read statistics and check processing health.
 
-`create_project` registers a project and returns its generated ID, OTLP credentials and Sentry DSN. `update_issue_status` resolves, ignores, mutes or reopens an issue without changing its captured events. Status changes are recorded in history. Neither tool can delete data or replace an existing project.
+`create_project` registers a project and returns its generated ID, OTLP credentials and Sentry DSN. `get_project` returns the same configuration for an existing project so a key can be recovered without registering a duplicate; the ingest secret is never returned, only a `secret_required` flag. `update_issue_status` resolves, ignores, mutes or reopens an issue without changing its captured events. Status changes are recorded in history. Neither tool can delete data or replace an existing project.
 
 All tools use the authenticated HTTP API. Release summaries come from captured event metadata.
 
@@ -271,6 +273,7 @@ Project tools take numeric-string `project_id`; issue/event detail tools require
 |---|---|---|
 | `create_project` | `name` | `hourly_limit`, `secret` boolean |
 | `list_projects` | none | `limit`, `offset` |
+| `get_project` | `project_id` | none |
 | `search_issues` | `project_id` | search filters, `status`, `limit`, `offset`, `cursor` |
 | `search_events` | `project_id` | search filters, `issue_id`, `limit`, `offset`, `cursor` |
 | `get_issue` | `project_id`, issue `id` | `limit`, `offset`, `cursor` |

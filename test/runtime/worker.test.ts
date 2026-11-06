@@ -139,7 +139,7 @@ test("official MCP client investigates and changes issue status through authenti
       fetch: (input, init) => exports.default.fetch(new Request(input, init)),
     }));
     const { tools } = await client.listTools();
-    expect(tools.map(tool => tool.name).sort()).toEqual(["create_project", "get_event", "get_issue", "get_issue_history", "get_processing_health", "get_stats", "list_projects", "list_releases", "search_events", "search_issues", "update_issue_status"]);
+    expect(tools.map(tool => tool.name).sort()).toEqual(["create_project", "get_event", "get_issue", "get_issue_history", "get_processing_health", "get_project", "get_stats", "list_projects", "list_releases", "search_events", "search_issues", "update_issue_status"]);
     expect(tools.filter(tool => !["create_project", "update_issue_status"].includes(tool.name)).every(tool => tool.annotations?.readOnlyHint === true)).toBe(true);
     expect(tools.find(tool => tool.name === "update_issue_status")?.annotations?.readOnlyHint).toBe(false);
     const created = await client.callTool({ name: "create_project", arguments: { name: "runtime project", secret: true } });

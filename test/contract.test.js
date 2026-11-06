@@ -103,6 +103,9 @@ test("actual success and auth-error responses match the repository contract", as
     await validate("/api/{project_id}/sourcemaps/{debug_id}", "put", await call(mapPath, { method: "PUT", headers: auth, body: JSON.stringify(map) }));
     await validate("/api/{project_id}/sourcemaps/{debug_id}", "get", await call(mapPath, { headers: auth }));
     await validate("/api/projects", "get", await call("/api/projects"));
+    const { project: registered } = await (await call("/api/projects", { method: "POST", headers: auth, body: '{"name":"key recovery"}' })).json();
+    const detail = await validate("/api/projects/{project_id}", "get", await call(`/api/projects/${registered.id}`, { headers: auth }));
+    assert.equal(detail.value.project.id, registered.id);
   } finally { b.sqlite.close(); }
 });
 

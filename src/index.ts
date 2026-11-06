@@ -3,7 +3,7 @@ import { createMiddleware } from "hono/factory";
 import { cors } from "hono/cors";
 import { requestId, type RequestIdVariables } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
-import { listIssues, getIssue, getEvent, listProjects, createProject, listReleases, patchIssue, authenticateAdmin, type Env, type Project } from "./core.ts";
+import { listIssues, getIssue, getEvent, listProjects, createProject, getProject, listReleases, patchIssue, authenticateAdmin, type Env, type Project, type ProjectDetail } from "./core.ts";
 import { ingestLogs, otlpError } from "./otlp.ts";
 import { ingestSentry, sentryError } from "./sentry.ts";
 import { HttpError } from "./http.ts";
@@ -11,9 +11,9 @@ import { handleMcp } from "./mcp.ts";
 import { searchEvents, issueHistory, eventStats, processingHealth } from "./investigation.ts";
 import { uploadSourceMap, getSourceMap, processEnrichment } from "./enrichment.ts";
 
-type AppEnv = { Bindings: Env; Variables: RequestIdVariables & { project: Project } };
+type AppEnv = { Bindings: Env; Variables: RequestIdVariables & { project: ProjectDetail } };
 const app = new Hono<AppEnv>({ strict: false });
-const readPaths = ["/api/projects", "/api/:project_id/issues", "/api/:project_id/issues/:id", "/api/:project_id/issues/:id/history", "/api/:project_id/events", "/api/:project_id/events/:id", "/api/:project_id/releases", "/api/:project_id/stats", "/api/:project_id/processing", "/api/:project_id/sourcemaps/:debug_id"];
+const readPaths = ["/api/projects", "/api/projects/:project_id", "/api/:project_id/issues", "/api/:project_id/issues/:id", "/api/:project_id/issues/:id/history", "/api/:project_id/events", "/api/:project_id/events/:id", "/api/:project_id/releases", "/api/:project_id/stats", "/api/:project_id/processing", "/api/:project_id/sourcemaps/:debug_id"];
 
 function methods(path: string): string[] {
   return ["GET", "HEAD", "OPTIONS", ...(path === "/api/projects" ? ["POST"] : path.endsWith("issues/:id") ? ["PATCH"] : path.endsWith("sourcemaps/:debug_id") ? ["PUT"] : [])];
@@ -51,7 +51,7 @@ app.get("/", c => c.redirect("https://bicho.fyi", 302));
 const project = createMiddleware<AppEnv>(async (c, next) => {
   const id = c.req.param("project_id");
   if (!id || !/^[1-9]\d{0,18}$/.test(id)) throw new HttpError(400, "Invalid project ID");
-  const row = await c.env.DB.prepare("SELECT id, public_key, secret_hash, hourly_limit FROM projects WHERE id = ?").bind(id).first<Project>();
+  const row = await c.env.DB.prepare("SELECT id, name, public_key, secret_hash, hourly_limit FROM projects WHERE id = ?").bind(id).first<ProjectDetail>();
   if (!row) throw new HttpError(404, "Project not found");
   c.set("project", row);
   await next();
@@ -119,6 +119,7 @@ for (const endpoint of ["envelope", "store"]) {
 
 app.get("/api/projects", adminAuth, c => listProjects(new URL(c.req.url), c.env));
 app.post("/api/projects", adminAuth, c => createProject(c.req.raw, c.env));
+app.get("/api/projects/:project_id", adminAuth, project, c => getProject(c.req.raw, c.get("project")));
 app.get("/api/:project_id/issues", adminAuth, project, c => listIssues(new URL(c.req.url), c.env, c.get("project")));
 app.get("/api/:project_id/issues/:id", adminAuth, project, c => getIssue(new URL(c.req.url), c.env, c.get("project"), c.req.param("id")));
 app.get("/api/:project_id/events/:id", adminAuth, project, c => getEvent(c.env, c.get("project"), c.req.param("id"), new URL(c.req.url)));

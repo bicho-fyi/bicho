@@ -6,6 +6,7 @@ export { listInvestigationIssues as listIssues } from "./investigation.ts";
 
 export type Env = { DB: D1Database; PAYLOADS: R2Bucket; BICHO_ADMIN_TOKEN?: string; CORS_ORIGINS?: string };
 export type Project = { id: string; public_key: string; secret_hash: string | null; hourly_limit: number };
+export type ProjectDetail = Project & { name: string };
 const encoder = new TextEncoder();
 
 
@@ -140,6 +141,13 @@ function integer(url: URL, key: string, fallback: number, maximum: number): numb
   return Number(value);
 }
 
+function ingestConfig(url: URL, project: { id: string; public_key: string }, secret?: string | null) {
+  return {
+    otlp: { endpoint: `${url.origin}/v1/logs`, headers: { "X-Bicho-Key": project.public_key, ...(secret ? { "X-Bicho-Secret": secret } : {}) } },
+    sentry: { dsn: `${url.protocol}//${project.public_key}@${url.host}/${project.id}`, ...(secret ? { headers: { "X-Bicho-Secret": secret } } : {}) },
+  };
+}
+
 export async function createProject(request: Request, env: Env): Promise<Response> {
   const bytes = await body(request, 4096);
   let input: JsonObject;
@@ -163,14 +171,17 @@ export async function createProject(request: Request, env: Env): Promise<Respons
     const project = await env.DB.prepare(`INSERT INTO projects (id, name, public_key, secret_hash, hourly_limit)
       VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING RETURNING id, name, hourly_limit`)
       .bind(id, name, publicKey, secretHash, hourlyLimit).first();
-    if (project) return Response.json({ project, otlp: {
-      endpoint: `${new URL(request.url).origin}/v1/logs`,
-      headers: { "X-Bicho-Key": publicKey, ...(secret ? { "X-Bicho-Secret": secret } : {}) },
-    }, sentry: { dsn: `${new URL(request.url).protocol}//${publicKey}@${new URL(request.url).host}/${id}`,
-      ...(secret ? { headers: { "X-Bicho-Secret": secret } } : {}),
-    } }, { status: 201 });
+    if (project) return Response.json({ project, ...ingestConfig(new URL(request.url), { id, public_key: publicKey }, secret) }, { status: 201 });
   }
   throw new HttpError(503, "Could not allocate project credentials");
+}
+
+export function getProject(request: Request, project: ProjectDetail): Response {
+  return Response.json({
+    project: { id: project.id, name: project.name, hourly_limit: project.hourly_limit },
+    secret_required: Boolean(project.secret_hash),
+    ...ingestConfig(new URL(request.url), project),
+  });
 }
 
 export async function listProjects(url: URL, env: Env): Promise<Response> {

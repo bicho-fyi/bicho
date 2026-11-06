@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Bicho core API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Self-hosted OTLP/HTTP and Sentry SDK error ingestion, append-only evidence, authenticated investigation reads, explicit issue state and MCP issue-status updates. This file is repository documentation only: the Worker serves no OpenAPI/Swagger/docs route. CORS preflights and automatic HEAD responses on read routes are transport behavior, not listed operations.",
     "license": {
       "name": "Apache-2.0",
@@ -601,6 +601,63 @@
           "500": {
             "$ref": "#/components/responses/Error500"
           }
+        }
+      }
+    },
+    "/api/projects/{project_id}": {
+      "get": {
+        "operationId": "getProject",
+        "summary": "Read one project and its ingest configuration",
+        "description": "Returns the project name and quota with its public ingest key, OTLP endpoint/headers and Sentry DSN. The ingest secret is never returned: secret_required=true means a backend must also send X-Bicho-Secret, which cannot be recovered and must be replaced by registering a new project.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[1-9]\\d{0,18}$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestId" },
+              "Cache-Control": { "$ref": "#/components/headers/CacheControl" }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["project", "secret_required", "otlp", "sentry"],
+                  "properties": {
+                    "project": { "$ref": "#/components/schemas/Project" },
+                    "secret_required": { "type": "boolean", "description": "True when ingestion also requires the backend-only X-Bicho-Secret header." },
+                    "otlp": {
+                      "type": "object",
+                      "required": ["endpoint", "headers"],
+                      "properties": {
+                        "endpoint": { "type": "string", "format": "uri" },
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["X-Bicho-Key"],
+                          "properties": {
+                            "X-Bicho-Key": { "type": "string", "pattern": "^[a-f0-9]{32}$" }
+                          }
+                        }
+                      }
+                    },
+                    "sentry": { "$ref": "#/components/schemas/SentryConfiguration" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" },
+          "401": { "$ref": "#/components/responses/Error401" },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "500": { "$ref": "#/components/responses/Error500" },
+          "503": { "$ref": "#/components/responses/Error503" }
         }
       }
     },

@@ -35,7 +35,7 @@ function query(values: Record<string, unknown>): string {
 }
 
 export async function handleMcp(request: Request, api: (path: string, init?: RequestInit) => Response | Promise<Response>): Promise<Response> {
-  const server = new McpServer({ name: "bicho", version: "1.0.0" });
+  const server = new McpServer({ name: "bicho", version: "1.1.0" });
   async function callApi(path: string, init?: RequestInit): Promise<CallToolResult> {
     const url = new URL(path, "https://bicho.internal");
     let response: Response;
@@ -62,6 +62,10 @@ export async function handleMcp(request: Request, api: (path: string, init?: Req
   server.registerTool("list_projects", {
     description: "List project IDs and names without exposing ingestion credentials.", inputSchema: pagination, annotations,
   }, page => callApi(`/api/projects?${query(page)}`));
+  server.registerTool("get_project", {
+    description: "Read one project's ingest configuration: public ingest key, OTLP endpoint and headers, and Sentry DSN. The ingest secret is never returned; secret_required=true means the backend must also send X-Bicho-Secret.",
+    inputSchema: { project_id: projectId }, annotations,
+  }, ({ project_id }) => callApi(`/api/projects/${project_id}`));
   server.registerTool("search_issues", {
     description: "Search issues with same-event time/tag filters. Defaults to unresolved; status=all includes hidden issues. Follow next_cursor while has_more is true for snapshot pagination; next_offset is unavailable on cursor pages." + untrusted,
     inputSchema: { project_id: projectId, ...filters, status: z.enum(["unresolved", "resolved", "ignored", "muted", "all"]).optional(), ...pagination, cursor }, annotations,
