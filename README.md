@@ -344,4 +344,4 @@ Bicho uses the [OpenTelemetry Protocol (OTLP)](https://opentelemetry.io/docs/spe
 
 ## License
 
-Copyright 2026 [Alex Zappa](https://alex.zappa.dev/) ([FreshJuice](https://freshjuice.dev/)). Licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE).
+Copyright 2026 [Alex Zappa](https://alex.zappa.dev/) ([FreshJuice](https://freshjuice.dev/)). Licensed under Apache-2.0. See [LICENSE](LICENSE) and [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
